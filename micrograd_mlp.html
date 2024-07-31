@@ -355,7 +355,7 @@
         let weight_decay = 1e-4;
         const eps = 1e-8;
 
-        const shockNoiseScale = 0.5; // Adjust this value to control the magnitude of the shock
+        const shockNoiseScale = 0.3; // Adjust this value to control the magnitude of the shock
 
         const btnPlayPause = document.getElementById('btn-play-pause');
         const btnStep = document.getElementById('btn-step');
@@ -621,7 +621,7 @@
             circle.addEventListener('mouseout', clearInfo);
             // circle.addEventListener('click', showInfo);
             circle.addEventListener('mouseenter', handleNodeHover);
-            circle.addEventListener('mouseleave', resetNodeHover);
+            circle.addEventListener('mouseleave', resetConnectionHighlights);
         }
 
         function drawBiasNode(x, y, layerIndex, parent) {
@@ -861,6 +861,7 @@
                         content = "**Backpropagate gradients**: Use the loss information to calculate gradients for each of the tunable weight parameters $$ W $$, starting at the end of the MLP and using the gradient information from later layers to calculate how much we should change the weights in the earlier layers.\n\nWe are able to accomplish this using the chain rule from calculus.";
                         break;
                     case 2:
+                        showNetworkGradients();
                         content = "**Update weights**: Use the gradient information to update the weights $$ W $$ of the network based on our optimization algorithm (AdamW in this case) and hyperparameters (e.g. learning rate, weight decay), with the goal of nudging this network towards better predictions of the output given the input.\n\nWe also zeros out the gradients to prepare for the next step.";
                         break;
                 }
@@ -880,11 +881,11 @@
                 if (nodeIndex === layerDims[layerIndex] + 1) {
                     content = `Indentity node (the vector $$\\mathbf{1}$$).\n\nIt provides a way to add the bias term as part of the matrix multiplication, instead of seperately.`;
                 } else if (layerIndex === 0) {
-                    content = `Input feature $$${nodeIndex}$$`;
+                    content = `Input feature at index $$${nodeIndex}$$`;
                 } else if (layerIndex === layerDims.length - 1) {
-                    content = `Output feature $$${nodeIndex}$$ for $$\\hat{y}$$`;
+                    content = `Output feature at index $$${nodeIndex}$$ for $$\\hat{y}$$`;
                 } else if (layerIndex === layerDims.length) {
-                    content = `Output feature $$${nodeIndex}$$ for $$y$$`;
+                    content = `Output feature at index $$${nodeIndex}$$ for $$y$$`;
                 } else {
                     content = `Node in fully connected layer ${layerIndex}, index ${nodeIndex}`;
                 }
@@ -1027,6 +1028,40 @@
             renderInfoContent(infoElement, content);
         }
 
+        function showNetworkGradients() {
+            const connections = document.querySelectorAll('.connection');
+            const nonZeroGradConnections = Array.from(connections).filter(connection => {
+                return parseFloat(connection.dataset.grad) !== 0;
+            });
+
+            nonZeroGradConnections.forEach( connection => {
+                connection.classList.add('highlighted');
+                // connection.setAttribute('stroke-width', '3');
+                // connection.setAttribute('color', 'red')
+
+                const gradient = parseFloat(connection.dataset.gradient);
+                const absGradient = Math.abs(gradient);
+                const gradEpsilon = 0.0001;
+
+                let color;
+                if (gradient >= 0) {
+                    color = `rgba(0, 0, 255, ${absGradient / (maxGradient + gradEpsilon)})`;
+                } else {
+                    color = `rgba(255, 0, 0, ${absGradient / (maxGradient + gradEpsilon)})`;
+                }
+                connection.style.filter = `drop-shadow(0 0 3px ${color})`;
+                    // // conn.style.filter = `drop-shadow(0 0 3px ${color})`;
+                    // if (strength >= 0) {
+                    //     conn.classList.add('positive');
+                    //     conn.classList.remove('negative');
+                    // } else {
+                    //     conn.classList.add('negative');
+                    //     conn.classList.remove('positive');
+                    // }
+            });
+            
+        }
+
         function clearInfo(event) {
             if (!selectedElement) {
                 document.getElementById('info').textContent = '';
@@ -1164,13 +1199,6 @@
                     const gradient = parseFloat(conn.dataset.gradient);
                     const absGradient = Math.abs(gradient);
 
-                    let color;
-                    if (gradient >= 0) {
-                        color = `rgba(0, 0, 255, ${absGradient / maxGradient})`;
-                    } else {
-                        color = `rgba(255, 0, 0, ${absGradient / maxGradient})`;
-                    }
-
                     // conn.style.filter = `drop-shadow(0 0 3px ${color})`;
                     if (strength >= 0) {
                         conn.classList.add('positive');
@@ -1192,7 +1220,8 @@
         }
 
 
-        function resetNodeHover() {
+        function resetConnectionHighlights() {
+            // used for clearing node hover and update hover events
             // if (selectedElement) return; // Don't reset if there's a selected element
             const highlightedConnections = document.querySelectorAll('.connection.highlighted');
             highlightedConnections.forEach(conn => {
@@ -1205,7 +1234,6 @@
 
         function resetConnectionAppearance(event) {
             const target = event.target;
-
             if (target.classList.contains('connection')) {
                 target.style.filter = '';
                 target.classList.remove('highlighted', 'positive', 'negative');
@@ -1418,7 +1446,7 @@
                 }
 
             });
-
+            updatedStrengthViz();
             updateConnectionOpacity();
          }
 
@@ -1971,6 +1999,7 @@
         });
 
         btnFwdBackUp.addEventListener('click', function () {
+            // TODO btn event handler for update
             trainModelStep(currentTrainingStage, false);
             updateFwdBackUpButton(this, currentTrainingStage);
             showInfo({ target: this });
@@ -1990,6 +2019,9 @@
             const button = document.getElementById(id);
             button.addEventListener('mouseover', showInfo);
             button.addEventListener('mouseout', clearInfo);
+            if (id == 'btn-fwd-backprop-update') {
+                button.addEventListener('mouseout', resetConnectionHighlights);
+            }
         });
 
         document.getElementById('layerDimInput').addEventListener('mouseover', showInfo);
