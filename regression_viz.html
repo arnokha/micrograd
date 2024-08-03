@@ -270,6 +270,10 @@
         .label-2 {
             fill: red;
         }
+
+        .prediction-line {
+            pointer-events: none;
+        }
     </style>
     <!-- for LaTeX -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
@@ -295,7 +299,7 @@
             <div id="bottom-right-container">
                 <div class="container">
                     <div id="data-visualization">
-                        <svg id="data-plot" width="380" height="380"></svg>
+                        <!-- <svg id="data-plot" width="380" height="380"></svg> -->
                     </div>
                 </div>
             </div>
@@ -330,7 +334,7 @@
         let w_true = -2;
         let b_true = 3;
         let noiseScale = 5;
-        
+
         // AdamW
         let learning_rate = 1e-1;
         let beta1 = 0.9;
@@ -341,7 +345,7 @@
         const infoElement = document.getElementById('info');
 
         let selectedElement = null;
-        const svg = document.getElementById('network');
+        const svgNetwork = document.getElementById('network');
 
         let svgWidth = 1200;
         let svgHeight = 700;
@@ -369,6 +373,10 @@
                 shape: "#999",
             }
         };
+
+        // Global variables for D3.js plot
+        let svg, x, y, xAxis, yAxis, scatter;
+        let currentTransform = d3.zoomIdentity;
 
 
         function getLayerColor(layerIndex) {
@@ -399,7 +407,7 @@
         // Draw the MLP
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         function drawNetwork() {
-            svg.innerHTML = '';
+            svgNetwork.innerHTML = '';
         }
 
 
@@ -474,7 +482,7 @@
                     line.dataset.strength = strength.toFixed(4);
                     line.dataset.gradient = weight.grad.toFixed(4);
 
-                    svg.appendChild(line);
+                    svgNetwork.appendChild(line);
 
                     line.addEventListener('mouseover', showInfo);
                     line.addEventListener('mouseout', (event) => {
@@ -502,7 +510,7 @@
                 line.classList.add('connection');
                 line.dataset.from = `${layerIndex},${i}`;
                 line.dataset.to = `${layerIndex + 1},${i}`;
-                svg.appendChild(line);
+                svgNetwork.appendChild(line);
 
                 line.addEventListener('mouseover', showInfo);
                 line.addEventListener('mouseout', clearInfo);
@@ -512,151 +520,278 @@
 
 
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-        // Draw data points
+        // Draw data points (d3.js)
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-        // function drawGrid() {
-        //     const svg = document.getElementById('data-plot');
-        //     const width = parseInt(svg.getAttribute('width'));
-        //     const height = parseInt(svg.getAttribute('height'));
+        function initializeD3Plot() {
+            const margin = { top: 10, right: 30, bottom: 30, left: 60 };
+            const width = 450 - margin.left - margin.right;
+            const height = 380 - margin.top - margin.bottom;
 
-        //     // Function to create a line element
-        //     function createLine(x1, y1, x2, y2) {
-        //         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        //         line.setAttribute('x1', x1);
-        //         line.setAttribute('y1', y1);
-        //         line.setAttribute('x2', x2);
-        //         line.setAttribute('y2', y2);
-        //         line.setAttribute('stroke', '#eee');
-        //         line.setAttribute('stroke-width', '1');
-        //         return line;
-        //     }
+            // Append the SVG object to the data-visualization div
+            svg = d3.select("#data-visualization")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        //     // Draw center lines
-        //     svg.appendChild(createLine(0, height / 2, width, height / 2));
-        //     svg.appendChild(createLine(width / 2, 0, width / 2, height));
+            // Add X axis
+            x = d3.scaleLinear()
+                .domain([-15, 15])
+                .range([0, width]);
+            xAxis = svg.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x));
 
-        //     // Draw ticks
-        //     for (let i = 1; i <= 3; i++) {
-        //         const x = (width / 4) * i;
-        //         const y = (height / 4) * i;
-        //         svg.appendChild(createLine(x, height / 2 - 5, x, height / 2 + 5));
-        //         svg.appendChild(createLine(width / 2 - 5, y, width / 2 + 5, y));
-        //     }
-        // }
-        function drawGrid(rangeMin, rangeMax) {
-            // Assert that rangeMin = -rangeMax
-            if (rangeMin !== -rangeMax) {
-                throw new Error("rangeMin must be equal to -rangeMax");
-            }
+            // Add Y axis
+            y = d3.scaleLinear()
+                .domain([-15, 15])
+                .range([height, 0]);
+            yAxis = svg.append("g")
+                .call(d3.axisLeft(y));
 
-            const svg = document.getElementById('data-plot');
-            const width = parseInt(svg.getAttribute('width'));
-            const height = parseInt(svg.getAttribute('height'));
+            // Add grid line at x = 0
+            svg.append("line")
+                .attr("class", "grid-line vertical")
+                .attr("x1", x(0))
+                .attr("y1", 0)
+                .attr("x2", x(0))
+                .attr("y2", height)
+                .attr("stroke", "#ddd")
+                .attr("stroke-dasharray", "4");
 
-            // Function to create a line element
-            function createLine(x1, y1, x2, y2) {
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', x1);
-                line.setAttribute('y1', y1);
-                line.setAttribute('x2', x2);
-                line.setAttribute('y2', y2);
-                line.setAttribute('stroke', '#eee');
-                line.setAttribute('stroke-width', '1');
-                return line;
-            }
+            // Add grid line at y = 0
+            svg.append("line")
+                .attr("class", "grid-line horizontal")
+                .attr("x1", 0)
+                .attr("y1", y(0))
+                .attr("x2", width)
+                .attr("y2", y(0))
+                .attr("stroke", "#ddd")
+                .attr("stroke-dasharray", "4");
 
-            // Draw center lines
-            svg.appendChild(createLine(0, height / 2, width, height / 2));
-            svg.appendChild(createLine(width / 2, 0, width / 2, height));
 
-            // Calculate the scale factor
-            const scale = width / (2 * rangeMax);
+            // Add a clipPath to ensure that elements are only visible within a specific area
+            svg.append("defs").append("SVG:clipPath")
+                .attr("id", "clip")
+                .append("SVG:rect")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("x", 0)
+                .attr("y", 0);
 
-            // Draw ticks
-            for (let i = rangeMin; i <= rangeMax; i++) {
-                if (i !== 0) { // Skip the center line as it's already drawn
-                    const x = (i - rangeMin) * scale;
-                    const y = (i - rangeMin) * scale;
-                    svg.appendChild(createLine(x, height / 2 - 5, x, height / 2 + 5));
-                    svg.appendChild(createLine(width / 2 - 5, y, width / 2 + 5, y));
-                }
-            }
+            // Create the scatter variable: where both the circles and the brush take place
+            scatter = svg.append('g')
+                .attr("clip-path", "url(#clip)");
+
+            // Add zoom capabilities
+            const zoom = d3.zoom()
+                .scaleExtent([0.8, 10])
+                .extent([[0, 0], [width, height]])
+                .on("zoom", updateChart);
+
+            svg.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .style("fill", "none")
+                .style("pointer-events", "all") // IMPORTANT allow panning and zoom
+                .style("cursor", "move")
+                .lower() // IMPORTANT Move this rect to the back to capture on hover effects for data points
+                .call(zoom);
         }
 
+        function updateChart(event) {
+            currentTransform = event.transform;
+            // Recover new scale
+            const newX = currentTransform.rescaleX(x);
+            const newY = currentTransform.rescaleY(y);
+
+            // Update axes
+            xAxis.call(d3.axisBottom(newX));
+            yAxis.call(d3.axisLeft(newY));
+
+            // Update vertical grid line (x = 0)
+            svg.select(".grid-line.vertical")
+                .attr("x1", newX(0))
+                .attr("x2", newX(0));
+
+            // Update horizontal grid line (y = 0)
+            svg.select(".grid-line.horizontal")
+                .attr("y1", newY(0))
+                .attr("y2", newY(0));
 
 
-        function plotDataPointsRegression(svg, dataPoints, predictions, rangeMin, rangeMax, 
-                                          isTrainingSet, dataPointSize = 4) {
-            // Assert that rangeMin = -rangeMax
-            if (rangeMin !== -rangeMax) {
-                throw new Error("rangeMin must be equal to -rangeMax");
-            }
-            const width = parseInt(svg.getAttribute('width'));
-            const height = parseInt(svg.getAttribute('height'));
+            // Update circle positions
+            scatter.selectAll("circle")
+                .attr('cx', d => newX(d[0]))
+                .attr('cy', d => newY(d[1]));
 
-            const dataMinX = rangeMin
-            const dataMaxX = rangeMax
-            const dataMinY = rangeMin
-            const dataMaxY = rangeMax
-            // logMessage(`${dataMinX} ${dataMaxX}     y   ${dataMinY} ${dataMaxY}`)
+            // Update true line
+            const lineData = [
+                { x: newX.domain()[0], y: w_true * newX.domain()[0] + b_true },
+                { x: newX.domain()[1], y: w_true * newX.domain()[1] + b_true }
+            ];
 
-            const scaleX = width / 30;
-            const scaleY = height / 30;
+            const line = d3.line()
+                .x(d => newX(d.x))
+                .y(d => newY(d.y));
 
-            for (let i = 0; i < dataPoints.length; i++) {
-                // logMessage(dataPoints[i])
-                const [x, y] = dataPoints[i];
+            scatter.select(".true-line")
+                .datum(lineData)
+                .attr("d", line);
 
-                const cx = (x - dataMinX) * scaleX;
-                const cy = height - (y - dataMinY) * scaleY;
-
-                const label = y;
-                let predictedValue;
-                if (predictions && predictions[i] !== undefined) {
-                    predictedValue = predictions[i];
-                } else {
-                    predictedValue = "missing";
-                }
-                let shape;
-                shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                shape.setAttribute('cx', cx);
-                shape.setAttribute('cy', cy);
-                shape.setAttribute('r', dataPointSize);
-
-                shape.setAttribute('class', `data-point regression ${isTrainingSet ? 'train' : 'val'}`);
-                shape.dataset.set = isTrainingSet ? 'Training' : 'Validation';
+            // Update predicted line
+            drawPredictedLine(newX, newY);
 
 
-                // Add data attributes for showInfo
-                shape.dataset.x0 = x.toFixed(2);
-                shape.dataset.x1 = y.toFixed(2);
-
-                // Add event listeners
-                shape.addEventListener('mouseover', showDataPointInfo);
-                shape.addEventListener('mouseout', clearInfo);
-
-                svg.appendChild(shape);
-            }
         }
-
 
         function updateDataPlot() {
-            const svg = document.getElementById('data-plot');
-            const rangeMin = -15;
-            const rangeMax = 15;
-
             // Clear existing content
-            while (svg.firstChild) {
-                svg.removeChild(svg.firstChild);
-            }
+            scatter.selectAll("*").remove();
 
-            drawGrid(rangeMin, rangeMax); // Draw the grid first
             // Plot training data
-            plotDataPointsRegression(svg, train_split, predsTrain, rangeMin, rangeMax, true);
+            plotDataPointsRegression(train_split, predsTrain, true);
 
             // Plot validation data
-            plotDataPointsRegression(svg, val_split, predsVal, rangeMin, rangeMax, false);
+            plotDataPointsRegression(val_split, predsVal, false);
 
+            // Draw the true line
+            drawTrueLine();
+
+            // Draw the predicted line
+            drawPredictedLine(x, y);
+        }
+
+        function drawTrueLine() {
+            const lineData = [
+                { x: x.domain()[0], y: w_true * x.domain()[0] + b_true },
+                { x: x.domain()[1], y: w_true * x.domain()[1] + b_true }
+            ];
+
+            const line = d3.line()
+                .x(d => x(d.x))
+                .y(d => y(d.y));
+
+            scatter.append("path")
+                .datum(lineData)
+                .attr("class", "true-line")
+                .attr("fill", "none")
+                .attr("stroke", "navy")
+                .attr("stroke-width", 3)
+                .attr("d", line)
+                .on("mouseover", showYTrueInfo)
+                .on("mouseout", function () {
+                    clearInfo();
+                    scatter.selectAll(".dotted-line").remove();
+                });
+        }
+
+        function drawPredictedLine(xScale, yScale) {
+            const lineData = [
+                { x: xScale.domain()[0], y: w_pred * xScale.domain()[0] + b_pred },
+                { x: xScale.domain()[1], y: w_pred * xScale.domain()[1] + b_pred }
+            ];
+
+            const line = d3.line()
+                .x(d => xScale(d.x))
+                .y(d => yScale(d.y));
+
+            scatter.selectAll(".predicted-line").remove();
+            scatter.append("path")
+                .datum(lineData)
+                .attr("class", "predicted-line")
+                .attr("fill", "none")
+                .attr("stroke", "#bbb")
+                .attr("stroke-width", 3)
+                // .attr("stroke-dasharray", "5,5")
+                .attr("d", line)
+                .on("mouseover", showYPredInfo)
+                .on("mouseout", clearInfo);
+        }
+
+        function drawLineToPrediction(xValue, yValue, yPred) {
+            // Remove any existing line
+            scatter.selectAll(".prediction-line").remove();
+
+            // Use the current transform to scale the coordinates
+            const newX = currentTransform.rescaleX(x);
+            const newY = currentTransform.rescaleY(y);
+
+            // Draw the line
+            scatter.append("line")
+                .attr("class", "prediction-line")
+                .attr("x1", newX(xValue))
+                .attr("y1", newY(yValue))
+                .attr("x2", newX(xValue))
+                .attr("y2", newY(yPred))
+                .attr("stroke", "red")
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", "5,5");
+        }
+
+
+
+        function showYTrueInfo(event) {
+            const content = `The line representing the **true** parameters ($$\\mathbf{w}=${w_true}, \\mathbf{b}=${b_true}$$)
+            $$ \\mathbf{y} = \\mathbf{w}x + \\mathbf{b} $$\n$$\\mathbf{y} = ${w_true}x + ${b_true}$$\n
+            The full function that generates the data is:
+            $$ \\mathbf{y} = \\mathbf{w}x + \\mathbf{b} + U(-${noiseScale},${noiseScale}) $$\n
+            where $$U$$ is a function that generates a random number uniformly between $$(-${noiseScale},${noiseScale})$$.`;
+            renderInfoContent(infoElement, content);
+
+            // Draw dotted lines
+            // drawDottedLines();
+        }
+
+        function showYPredInfo(event) {
+            const content = `The line representing our current guesses ($$w=${w_pred.toFixed(2)}, b=${b_pred.toFixed(2)}$$)
+            $$ \\hat{y} = wx + b $$
+            $$\\hat{y} = ${w_pred.toFixed(2)}x + ${b_pred.toFixed(2)}$$`;
+            renderInfoContent(infoElement, content);
+        }
+
+
+        function plotDataPointsRegression(dataPoints, predictions, isTrainingSet, r = 5) {
+            const className = isTrainingSet ? "train-point" : "val-point";
+
+            scatter.selectAll(`.${className}`)
+                .data(dataPoints)
+                .join("circle")
+                .attr("class", `data-point regression ${isTrainingSet ? 'train' : 'val'}`)
+                .attr("cx", d => x(d[0]))
+                .attr("cy", d => y(d[1]))
+                .attr("r", r)
+                .on("mouseover", (event, d) => {
+                    showDataPointInfo(event, d);
+                })
+                .on("mouseout", (event) => {
+                    clearInfo();
+                    removeLineToPrediction();
+                });
+
+        }
+
+        function removeLineToPrediction() {
+            scatter.selectAll(".prediction-line").remove();
+        }
+
+
+        function showDataPointInfo(event, d) {
+            const [xValue, yValue] = d;
+            const y_pred = w_pred * xValue + b_pred;
+            const diff = (y_pred - yValue).toFixed(2)
+            const loss = (diff ** 2).toFixed(2)
+            const content = `**${event.target.classList.contains('train') ? 'Training' : 'Validation'}** Data Point\n
+            $$\\mathbf{x} = ${xValue.toFixed(2)}$$
+            $$\\mathbf{y} = ${yValue.toFixed(2)}$$
+            $$\\hat{y} = ${y_pred.toFixed(2)}$$\n
+            Difference: $$\\hat{y} - \\mathbf{y} = ${diff}$$
+            Loss: = $$(\\hat{y} - \\mathbf{y})^2 = ${loss}$$`;
+            renderInfoContent(infoElement, content);
+
+            // Draw the line to prediction
+            drawLineToPrediction(xValue, yValue, y_pred);
         }
 
 
@@ -803,24 +938,6 @@
             renderInfoContent(infoElement, content);
         }
 
-        function showDataPointInfo(event) {
-            // TODO add predicted
-            // TODO add predicted y coordinate from forward prop like we did w labels
-            // TODO add predicted
-
-            const target = event.target;
-            const isTraining = target.dataset.set === "Training";
-            const calculationFrequency = "";
-            // const calculationFrequency = isTraining
-            //     ? "Updated every epoch"
-            //     : `Evaluated every ${valInterval} epochs`;
-
-            const content = `**${target.dataset.set}** Data Point\n
-        Coordinates: (${target.dataset.x0}, ${target.dataset.x1})
-    `;
-            renderInfoContent(infoElement, content);
-        }
-
 
         function showReportingInfo(event) {
             const target = event.currentTarget;
@@ -906,18 +1023,18 @@
             const layerGap = svgWidth / (layerDims.length + 2);
 
             // Input layer label
-            svg.appendChild(createLatexLabel(layerGap, svgHeight - 20, '\\mathbf{x}', LATEX_COLOR, "x"));
+            svgNetwork.appendChild(createLatexLabel(layerGap, svgHeight - 20, '\\mathbf{x}', LATEX_COLOR, "x"));
             // Hidden layer labels
             for (let i = 1; i < layerDims.length - 1; i++) {
-                svg.appendChild(createLatexLabel((i + 1) * layerGap, svgHeight - 20, `\\mathbf{x}:=\\phi(\\mathbf{W}_{${i}}\\mathbf{x})`, LATEX_COLOR, "fc" + i));
+                svgNetwork.appendChild(createLatexLabel((i + 1) * layerGap, svgHeight - 20, `\\mathbf{x}:=\\phi(\\mathbf{W}_{${i}}\\mathbf{x})`, LATEX_COLOR, "fc" + i));
             }
             // Output layer label
-            svg.appendChild(createLatexLabel(layerDims.length * layerGap, svgHeight - 20, `\\hat{\\mathbf{y}} := \\mathbf{W}_{${layerDims.length - 1}}\\mathbf{x}`, LATEX_COLOR, "y_hat"));
+            svgNetwork.appendChild(createLatexLabel(layerDims.length * layerGap, svgHeight - 20, `\\hat{\\mathbf{y}} := \\mathbf{W}_{${layerDims.length - 1}}\\mathbf{x}`, LATEX_COLOR, "y_hat"));
             // True values label
-            svg.appendChild(createLatexLabel((layerDims.length + 1) * layerGap, svgHeight - 20, '\\mathbf{y}', LATEX_COLOR, "y"));
+            svgNetwork.appendChild(createLatexLabel((layerDims.length + 1) * layerGap, svgHeight - 20, '\\mathbf{y}', LATEX_COLOR, "y"));
             // Weight labels
             for (let i = 1; i < layerDims.length; i++) {
-                svg.appendChild(createLatexLabel(i * layerGap + layerGap / 2, 20, `\\mathbf{W}_{${i}}`, LATEX_COLOR, "W" + i));
+                svgNetwork.appendChild(createLatexLabel(i * layerGap + layerGap / 2, 20, `\\mathbf{W}_{${i}}`, LATEX_COLOR, "W" + i));
             }
         }
 
@@ -925,7 +1042,7 @@
         function addLossLabel() {
             const lastLayerX = (layerDims.length + 1) * (svgWidth / (layerDims.length + 2));
             const braceWidth = 15;
-            svg.appendChild(createLatexLabel(lastLayerX + braceWidth * 1.5 + 80, svgHeight / 2, 'L(\\hat{\\mathbf{y}}, \\mathbf{y})', LATEX_COLOR_LOSS, "loss"));
+            svgNetwork.appendChild(createLatexLabel(lastLayerX + braceWidth * 1.5 + 80, svgHeight / 2, 'L(\\hat{\\mathbf{y}}, \\mathbf{y})', LATEX_COLOR_LOSS, "loss"));
         }
 
 
@@ -1505,7 +1622,7 @@
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         const random = new RNG(42);
 
-        svg.addEventListener('click', function (event) {
+        svgNetwork.addEventListener('click', function (event) {
             showInfo(event);
         });
 
@@ -1520,6 +1637,7 @@
         document.querySelectorAll('.node, .connection, .layer, .latex-label').forEach(addEventListeners);
 
         window.onload = function () {
+            initializeD3Plot();
             resetData();
         };
 
