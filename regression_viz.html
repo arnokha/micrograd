@@ -105,6 +105,18 @@
             outline: 1px solid navy;
         }
 
+        .data-params-input {
+            width: 35px;
+            font-size: 16px;
+            font-weight: 500;
+            border: 0;
+            background-color: #dbf4ff33;
+        }
+
+        .data-params-input:hover {
+            outline: 1px solid navy;
+        }
+
         .layer:hover rect {
             fill: rgb(190, 190, 190);
             fill-opacity: 0.1;
@@ -295,8 +307,24 @@
         <div id="right-container">
             <div id="info-container">
                 <div id="info"></div>
+                <div id="button-group-container">
+                    <div id="button-group">
+                        <button id="btn-reset-mlp" class="small-button">↺</button>
+                        <button id="btn-play-pause" class="large-button">
+                            <span id="btn-play-pause-content">▶</span>
+                        </button>
+                        <button id="btn-step" class="small-button">▶|</button>
+                        <button id="btn-fwd-backprop-update" class="small-button">→</button>
+                    </div>
+                </div>
             </div>
             <div id="bottom-right-container">
+                <div id="controls">
+                    <span id="w-label"></span><input type="text" id="w-input" class="data-params-input">
+                    <span id="b-label"></span><input type="text" id="b-input" class="data-params-input">
+                    <span>noise = </span><input type="text" id="noise-input" class="data-params-input">
+                    <button id="btn-edit-dims" onclick="resetData()">Regenerate data</button>
+                </div>
                 <div class="container">
                     <div id="data-visualization">
                         <!-- <svg id="data-plot" width="380" height="380"></svg> -->
@@ -394,6 +422,11 @@
         }
 
         function resetData() {
+            w_true = parseFloat(document.getElementById('w-input').value);
+            b_true = parseFloat(document.getElementById('b-input').value);
+            noiseScale = parseFloat(document.getElementById('noise-input').value);
+    
+
             [train_split, val_split, test_split] = gen_data_linear_regression(random, 100);
             epoch = 0;
             predsTrain = [];
@@ -647,6 +680,7 @@
         }
 
         function updateDataPlot() {
+            currentTransform = d3.zoomIdentity;
             // Clear existing content
             scatter.selectAll("*").remove();
 
@@ -787,7 +821,7 @@
             $$\\mathbf{y} = ${yValue.toFixed(2)}$$
             $$\\hat{y} = ${y_pred.toFixed(2)}$$\n
             Difference: $$\\hat{y} - \\mathbf{y} = ${diff}$$
-            Loss: = $$(\\hat{y} - \\mathbf{y})^2 = ${loss}$$`;
+            Loss: $$(\\hat{y} - \\mathbf{y})^2 = ${loss}$$`;
             renderInfoContent(infoElement, content);
 
             // Draw the line to prediction
@@ -988,6 +1022,20 @@
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         // Create figure labels
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+        function renderLatexLabelsDataPlot() {
+            katex.render("\\mathbf{w} =", document.getElementById('w-label'), {
+                throwOnError: false,
+                displayMode: false,
+                fontSize: '16px'
+            });
+            katex.render("\\mathbf{b} =", document.getElementById('b-label'), {
+                throwOnError: false,
+                displayMode: false,
+                fontSize: '16px'
+            });
+        }
+
+
         function createLatexLabel(x, y, text, color, labelInfo) {
             const foreignObject = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
             foreignObject.setAttribute('x', x - 75);
@@ -1632,12 +1680,19 @@
             element.addEventListener('click', showInfo);
         }
 
+        function setInitialValues() {
+            document.getElementById('w-input').value = w_true;
+            document.getElementById('b-input').value = b_true;
+            document.getElementById('noise-input').value = noiseScale;
+        }
 
 
         document.querySelectorAll('.node, .connection, .layer, .latex-label').forEach(addEventListeners);
 
         window.onload = function () {
             initializeD3Plot();
+            renderLatexLabelsDataPlot();
+            setInitialValues();
             resetData();
         };
 
