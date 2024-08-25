@@ -236,19 +236,19 @@
         }
 
         .data-point.hit {
-            fill-opacity: 0.3;
-        }
-
-        /* .data-point.train {} */
-
-        .data-point.val {
-            stroke: #999;
-            stroke-width: 2;
+            fill-opacity: 0.2;
         }
 
         .data-point.miss {
-            fill-opacity: 1;
+            fill-opacity: 0.6;
         }
+        /* .data-point.train {} */
+
+        .data-point.val {
+            stroke: #bbb;
+            stroke-width: 2;
+        }
+
 
         .label-missing {
             fill: gray;
@@ -370,7 +370,7 @@
         // const info = document.getElementById('info');
         const MAX_LAYER_SIZE = 16;
         const MAX_N_LAYERS_HIDDEN = 3;
-        const initialHidden = "10,"
+        const initialHidden = "2,"
         const initialLayers = `[2, ${initialHidden} 3]`
         // const initialLayers = "[2, 10, 10, 3]"
         layerDims = JSON.parse(initialLayers)
@@ -714,134 +714,6 @@
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         // Draw data points
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-        // TODO d3
-        // function drawGrid() {
-        //     const svg = document.getElementById('data-plot');
-        //     const width = parseInt(svg.getAttribute('width'));
-        //     const height = parseInt(svg.getAttribute('height'));
-
-        //     // Function to create a line element
-        //     function createLine(x1, y1, x2, y2) {
-        //         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        //         line.setAttribute('x1', x1);
-        //         line.setAttribute('y1', y1);
-        //         line.setAttribute('x2', x2);
-        //         line.setAttribute('y2', y2);
-        //         line.setAttribute('stroke', '#eee');
-        //         line.setAttribute('stroke-width', '1');
-        //         return line;
-        //     }
-
-        //     // Draw center lines
-        //     svg.appendChild(createLine(0, height / 2, width, height / 2));
-        //     svg.appendChild(createLine(width / 2, 0, width / 2, height));
-
-        //     // Draw ticks
-        //     for (let i = 1; i <= 3; i++) {
-        //         const x = (width / 4) * i;
-        //         const y = (height / 4) * i;
-        //         svg.appendChild(createLine(x, height / 2 - 5, x, height / 2 + 5));
-        //         svg.appendChild(createLine(width / 2 - 5, y, width / 2 + 5, y));
-        //     }
-        // }
-
-
-        // function plotDataPoints(svg, dataPoints, predictions, isTrainingSet, dataPointSize = 5) {
-        //     const width = parseInt(svg.getAttribute('width'));
-        //     const height = parseInt(svg.getAttribute('height'));
-        //     const dataMinX = -2;
-        //     const dataMaxX = 2;
-        //     const dataMinY = -2;
-        //     const dataMaxY = 2;
-        //     const scaleX = width / 4;
-        //     const scaleY = height / 4;
-
-        //     for (let i = 0; i < dataPoints.length; i++) {
-        //         const [x, y] = dataPoints[i];
-
-        //         const cx = (x[0] - dataMinX) * scaleX;
-        //         const cy = height - (x[1] - dataMinY) * scaleY;
-
-        //         const label = y;
-        //         let predictedLabel;
-        //         if (predictions && predictions[i] !== undefined) {
-        //             predictedLabel = predictions[i];
-        //         } else {
-        //             predictedLabel = "missing";
-        //         }
-        //         const isHit = predictedLabel === y;
-        //         let shape;
-        //         switch (label) {
-        //             case 0:
-        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        //                 shape.setAttribute('cx', cx);
-        //                 shape.setAttribute('cy', cy);
-        //                 shape.setAttribute('r', dataPointSize);
-        //                 break;
-        //             case 1:
-        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        //                 shape.setAttribute('x', cx - dataPointSize);
-        //                 shape.setAttribute('y', cy - dataPointSize);
-        //                 shape.setAttribute('width', dataPointSize * 2);
-        //                 shape.setAttribute('height', dataPointSize * 2);
-        //                 break;
-        //             case 2:
-        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        //                 const adjSz = dataPointSize + 1 // make triangles slightly bigger
-        //                 shape.setAttribute('points', `${cx},${cy - adjSz} ${cx - adjSz},${cy + adjSz} ${cx + adjSz},${cy + adjSz}`);
-        //                 break;
-        //             default:
-        //                 console.error('Unknown label:', label);
-        //                 continue;
-        //         }
-
-        //         shape.setAttribute('class', `data-point ${isHit ? 'hit' : 'miss'} label-${predictedLabel} ${isTrainingSet ? 'train' : 'val'}`);
-
-        //         // Add data attributes for showInfo
-        //         shape.dataset.x0 = x[0].toFixed(2);
-        //         shape.dataset.x1 = x[1].toFixed(2);
-        //         shape.dataset.actualLabel = label;
-        //         shape.dataset.predictedLabel = predictedLabel;
-        //         shape.dataset.isHit = isHit;
-        //         shape.dataset.set = isTrainingSet ? 'Training' : 'Validation';
-
-        //         // Add event listeners
-        //         shape.addEventListener('mouseover', showDataPointInfo);
-        //         shape.addEventListener('mouseout', clearInfo);
-
-        //         svg.appendChild(shape);
-        //     }
-        // }
-
-
-        // function updateDataPlot() {
-        //     const svg = document.getElementById('data-plot');
-        //     const width = parseInt(svg.getAttribute('width'));
-        //     const height = parseInt(svg.getAttribute('height'));
-        //     // Input range
-        //     const dataMinX = -2;
-        //     const dataMaxX = 2;
-        //     const dataMinY = -2;
-        //     const dataMaxY = 2;
-        //     const scaleX = width / 4;
-        //     const scaleY = height / 4;
-
-        //     // Clear existing content
-        //     while (svg.firstChild) {
-        //         svg.removeChild(svg.firstChild);
-        //     }
-
-        //     drawGrid(); // Draw the grid first
-        //     // Plot training data
-        //     plotDataPoints(svg, train_split, predsTrain, true);
-
-        //     // Plot validation data
-        //     plotDataPoints(svg, val_split, predsVal, false);
-
-        // }
-        // END TODO d3
-        
-
         function initializeD3Plot() {
             const margin = { top: 10, right: 30, bottom: 30, left: 60 };
             const width = 450 - margin.left - margin.right;
@@ -942,14 +814,11 @@
                 .attr("y1", newY(0))
                 .attr("y2", newY(0));
 
-                // console.log(scatter.selectAll(".data-point").data());
             // Update data points
             scatter.selectAll(".data-point")
                 .attr("transform", d => {
-                    // console.log('Data point:', d);
                     const cx = newX(d.x0);
                     const cy = newY(d.x1);
-                    // console.log('Transformed:', cx, cy);
                     return `translate(${cx},${cy})`;
                 });
         }
@@ -1057,8 +926,9 @@
             } else if (target.classList.contains('node')) {
                 const layerIndex = parseInt(target.dataset.layer);
                 const nodeIndex = parseInt(target.dataset.node);
-                if (nodeIndex === layerDims[layerIndex] + 1) {
-                    content = `Indentity node (the vector $$\\mathbf{1}$$).\n\nIt provides a way to add the bias term as part of the matrix multiplication, instead of seperately.`;
+                const isBiasNode = nodeIndex === layerDims[layerIndex];
+                if (isBiasNode) {
+                    content = `Identity node representing the static number $$1$$.\n\nIt provides a way to add the bias term as part of the matrix multiplication, instead performing a seperate addition.`;
                 } else if (layerIndex === 0) {
                     content = `Input feature at index $$${nodeIndex}$$`;
                 } else if (layerIndex === layerDims.length - 1) {
