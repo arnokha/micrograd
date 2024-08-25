@@ -227,7 +227,7 @@
         }
 
         #data-plot {
-            border: 1px solid #ccc;
+            
         }
 
         .data-point {
@@ -266,14 +266,14 @@
         .label-2 {
             fill: red;
         }
-
-
     </style>
     <!-- for LaTeX -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.css">
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.4/dist/katex.min.js"></script>
     <!-- for anim -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <!-- for plotting data -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 
 <body>
@@ -309,14 +309,14 @@
                 </div>
                 <div class="container">
                     <div id="data-visualization">
-                        <svg id="data-plot" width="380" height="380"></svg>
+                        <!-- <svg id="data-plot" width="450" height="380"></svg> -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <div id="reporting-container">
-        <div id="epoch-display">Epoch: 0</div>
+        <div id="epoch-display">Epoch: N/A</div>
         <div id="train-loss-display" class="loss-display">
             <span class="loss-label">Training Loss:</span>
             <span id="train-loss-value">N/A</span>
@@ -370,12 +370,16 @@
         // const info = document.getElementById('info');
         const MAX_LAYER_SIZE = 16;
         const MAX_N_LAYERS_HIDDEN = 3;
-        const initialHidden = "8,"
+        const initialHidden = "10,"
         const initialLayers = `[2, ${initialHidden} 3]`
         // const initialLayers = "[2, 10, 10, 3]"
         layerDims = JSON.parse(initialLayers)
         let svgWidth = 1200;
         let svgHeight = 700;
+
+        // Global variables for D3.js plot
+        let svgDataPoints, x, y, xAxis, yAxis, scatter; 
+        let currentTransform = d3.zoomIdentity;
 
         const valInterval = 10; // interval for calculating validation loss
 
@@ -417,7 +421,7 @@
         }
 
         function resetData() {
-            [train_split, val_split, test_split] = gen_data(random, 100);
+            [train_split, val_split, test_split] = gen_data(random);
             resetTrainingDisplay();
             epoch = 0;
             predsTrain = [];
@@ -666,7 +670,7 @@
 
                     line.classList.add('connection');
                     line.dataset.from = `${layerIndex},${j}`;
-                    line.dataset.to = `${layerIndex+1},${i}`;
+                    line.dataset.to = `${layerIndex + 1},${i}`;
                     line.dataset.strength = strength.toFixed(4);
                     line.dataset.gradient = weight.grad.toFixed(4);
 
@@ -697,7 +701,7 @@
 
                 line.classList.add('connection');
                 line.dataset.from = `${layerIndex},${i}`;
-                line.dataset.to = `${layerIndex+1},${i}`;
+                line.dataset.to = `${layerIndex + 1},${i}`;
                 svg.appendChild(line);
 
                 line.addEventListener('mouseover', showInfo);
@@ -710,129 +714,304 @@
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         // Draw data points
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-        function drawGrid() {
-            const svg = document.getElementById('data-plot');
-            const width = parseInt(svg.getAttribute('width'));
-            const height = parseInt(svg.getAttribute('height'));
+        // TODO d3
+        // function drawGrid() {
+        //     const svg = document.getElementById('data-plot');
+        //     const width = parseInt(svg.getAttribute('width'));
+        //     const height = parseInt(svg.getAttribute('height'));
 
-            // Function to create a line element
-            function createLine(x1, y1, x2, y2) {
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                line.setAttribute('x1', x1);
-                line.setAttribute('y1', y1);
-                line.setAttribute('x2', x2);
-                line.setAttribute('y2', y2);
-                line.setAttribute('stroke', '#eee');
-                line.setAttribute('stroke-width', '1');
-                return line;
-            }
+        //     // Function to create a line element
+        //     function createLine(x1, y1, x2, y2) {
+        //         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        //         line.setAttribute('x1', x1);
+        //         line.setAttribute('y1', y1);
+        //         line.setAttribute('x2', x2);
+        //         line.setAttribute('y2', y2);
+        //         line.setAttribute('stroke', '#eee');
+        //         line.setAttribute('stroke-width', '1');
+        //         return line;
+        //     }
 
-            // Draw center lines
-            svg.appendChild(createLine(0, height / 2, width, height / 2));
-            svg.appendChild(createLine(width / 2, 0, width / 2, height));
+        //     // Draw center lines
+        //     svg.appendChild(createLine(0, height / 2, width, height / 2));
+        //     svg.appendChild(createLine(width / 2, 0, width / 2, height));
 
-            // Draw ticks
-            for (let i = 1; i <= 3; i++) {
-                const x = (width / 4) * i;
-                const y = (height / 4) * i;
-                svg.appendChild(createLine(x, height / 2 - 5, x, height / 2 + 5));
-                svg.appendChild(createLine(width / 2 - 5, y, width / 2 + 5, y));
-            }
+        //     // Draw ticks
+        //     for (let i = 1; i <= 3; i++) {
+        //         const x = (width / 4) * i;
+        //         const y = (height / 4) * i;
+        //         svg.appendChild(createLine(x, height / 2 - 5, x, height / 2 + 5));
+        //         svg.appendChild(createLine(width / 2 - 5, y, width / 2 + 5, y));
+        //     }
+        // }
+
+
+        // function plotDataPoints(svg, dataPoints, predictions, isTrainingSet, dataPointSize = 5) {
+        //     const width = parseInt(svg.getAttribute('width'));
+        //     const height = parseInt(svg.getAttribute('height'));
+        //     const dataMinX = -2;
+        //     const dataMaxX = 2;
+        //     const dataMinY = -2;
+        //     const dataMaxY = 2;
+        //     const scaleX = width / 4;
+        //     const scaleY = height / 4;
+
+        //     for (let i = 0; i < dataPoints.length; i++) {
+        //         const [x, y] = dataPoints[i];
+
+        //         const cx = (x[0] - dataMinX) * scaleX;
+        //         const cy = height - (x[1] - dataMinY) * scaleY;
+
+        //         const label = y;
+        //         let predictedLabel;
+        //         if (predictions && predictions[i] !== undefined) {
+        //             predictedLabel = predictions[i];
+        //         } else {
+        //             predictedLabel = "missing";
+        //         }
+        //         const isHit = predictedLabel === y;
+        //         let shape;
+        //         switch (label) {
+        //             case 0:
+        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        //                 shape.setAttribute('cx', cx);
+        //                 shape.setAttribute('cy', cy);
+        //                 shape.setAttribute('r', dataPointSize);
+        //                 break;
+        //             case 1:
+        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        //                 shape.setAttribute('x', cx - dataPointSize);
+        //                 shape.setAttribute('y', cy - dataPointSize);
+        //                 shape.setAttribute('width', dataPointSize * 2);
+        //                 shape.setAttribute('height', dataPointSize * 2);
+        //                 break;
+        //             case 2:
+        //                 shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        //                 const adjSz = dataPointSize + 1 // make triangles slightly bigger
+        //                 shape.setAttribute('points', `${cx},${cy - adjSz} ${cx - adjSz},${cy + adjSz} ${cx + adjSz},${cy + adjSz}`);
+        //                 break;
+        //             default:
+        //                 console.error('Unknown label:', label);
+        //                 continue;
+        //         }
+
+        //         shape.setAttribute('class', `data-point ${isHit ? 'hit' : 'miss'} label-${predictedLabel} ${isTrainingSet ? 'train' : 'val'}`);
+
+        //         // Add data attributes for showInfo
+        //         shape.dataset.x0 = x[0].toFixed(2);
+        //         shape.dataset.x1 = x[1].toFixed(2);
+        //         shape.dataset.actualLabel = label;
+        //         shape.dataset.predictedLabel = predictedLabel;
+        //         shape.dataset.isHit = isHit;
+        //         shape.dataset.set = isTrainingSet ? 'Training' : 'Validation';
+
+        //         // Add event listeners
+        //         shape.addEventListener('mouseover', showDataPointInfo);
+        //         shape.addEventListener('mouseout', clearInfo);
+
+        //         svg.appendChild(shape);
+        //     }
+        // }
+
+
+        // function updateDataPlot() {
+        //     const svg = document.getElementById('data-plot');
+        //     const width = parseInt(svg.getAttribute('width'));
+        //     const height = parseInt(svg.getAttribute('height'));
+        //     // Input range
+        //     const dataMinX = -2;
+        //     const dataMaxX = 2;
+        //     const dataMinY = -2;
+        //     const dataMaxY = 2;
+        //     const scaleX = width / 4;
+        //     const scaleY = height / 4;
+
+        //     // Clear existing content
+        //     while (svg.firstChild) {
+        //         svg.removeChild(svg.firstChild);
+        //     }
+
+        //     drawGrid(); // Draw the grid first
+        //     // Plot training data
+        //     plotDataPoints(svg, train_split, predsTrain, true);
+
+        //     // Plot validation data
+        //     plotDataPoints(svg, val_split, predsVal, false);
+
+        // }
+        // END TODO d3
+        
+
+        function initializeD3Plot() {
+            const margin = { top: 10, right: 30, bottom: 30, left: 60 };
+            const width = 450 - margin.left - margin.right;
+            const height = 380 - margin.top - margin.bottom;
+
+            // Append the SVG object to the data-plot div 
+            // svgDataPoints = d3.select("#data-plot")
+            svgDataPoints = d3.select("#data-visualization")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            // Add X axis
+            x = d3.scaleLinear()
+                .domain([-2, 2])
+                .range([0, width]);
+            xAxis = svgDataPoints.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(d3.axisBottom(x));
+
+            // Add Y axis
+            y = d3.scaleLinear()
+                .domain([-2, 2])
+                .range([height, 0]);
+            yAxis = svgDataPoints.append("g")
+                // .attr("transform", `translate(${width},0)`)
+                .call(d3.axisLeft(y));
+
+            // Add grid line at x = 0
+            svgDataPoints.append("line")
+                .attr("class", "grid-line vertical")
+                .attr("x1", x(0))
+                .attr("y1", 0)
+                .attr("x2", x(0))
+                .attr("y2", height)
+                .attr("stroke", "#ddd")
+                .attr("stroke-dasharray", "4");
+
+            // // Add grid line at y = 0
+            svgDataPoints.append("line")
+                .attr("class", "grid-line horizontal")
+                .attr("x1", 0)
+                .attr("y1", y(0))
+                .attr("x2", width)
+                .attr("y2", y(0))
+                .attr("stroke", "#ddd")
+                .attr("stroke-dasharray", "4");
+
+            // Add a clipPath
+            svgDataPoints.append("defs").append("SVG:clipPath")
+                .attr("id", "clip")
+                .append("SVG:rect")
+                .attr("width", width)
+                .attr("height", height)
+                .attr("x", 0)
+                .attr("y", 0);
+
+            // Create the scatter variable
+            scatter = svgDataPoints.append('g')
+                .attr("clip-path", "url(#clip)");
+
+            // Add zoom capabilities
+            const zoom = d3.zoom()
+                .scaleExtent([0.8, 10])
+                .extent([[0, 0], [width, height]])
+                .on("zoom", updateChart);
+
+            svgDataPoints.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .style("fill", "none")
+                .style("pointer-events", "all") // IMPORTANT allow panning and zoom
+                .style("cursor", "move")
+                .lower() // IMPORTANT Move this rect to the back to capture on hover effects for data points
+                .call(zoom);
         }
 
 
-        function plotDataPoints(svg, dataPoints, predictions, isTrainingSet, dataPointSize = 5) {
-            const width = parseInt(svg.getAttribute('width'));
-            const height = parseInt(svg.getAttribute('height'));
-            const dataMinX = -2;
-            const dataMaxX = 2;
-            const dataMinY = -2;
-            const dataMaxY = 2;
-            const scaleX = width / 4;
-            const scaleY = height / 4;
+        function updateChart(event) {
+            currentTransform = event.transform;
+            // Recover new scale
+            const newX = currentTransform.rescaleX(x);
+            const newY = currentTransform.rescaleY(y);
 
-            for (let i = 0; i < dataPoints.length; i++) {
-                const [x, y] = dataPoints[i];
+            // Update axes
+            xAxis.call(d3.axisBottom(newX));
+            yAxis.call(d3.axisLeft(newY));
 
-                const cx = (x[0] - dataMinX) * scaleX;
-                const cy = height - (x[1] - dataMinY) * scaleY;
+            // Update vertical grid line (x = 0)
+            svgDataPoints.select(".grid-line.vertical")
+                .attr("x1", newX(0))
+                .attr("x2", newX(0));
 
-                const label = y;
-                let predictedLabel;
-                if (predictions && predictions[i] !== undefined) {
-                    predictedLabel = predictions[i];
-                } else {
-                    predictedLabel = "missing";
-                }
-                const isHit = predictedLabel === y;
-                let shape;
-                switch (label) {
-                    case 0:
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                        shape.setAttribute('cx', cx);
-                        shape.setAttribute('cy', cy);
-                        shape.setAttribute('r', dataPointSize);
-                        break;
-                    case 1:
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                        shape.setAttribute('x', cx - dataPointSize);
-                        shape.setAttribute('y', cy - dataPointSize);
-                        shape.setAttribute('width', dataPointSize * 2);
-                        shape.setAttribute('height', dataPointSize * 2);
-                        break;
-                    case 2:
-                        shape = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                        const adjSz = dataPointSize + 1 // make triangles slightly bigger
-                        shape.setAttribute('points', `${cx},${cy - adjSz} ${cx - adjSz},${cy + adjSz} ${cx + adjSz},${cy + adjSz}`);
-                        break;
-                    default:
-                        console.error('Unknown label:', label);
-                        continue;
-                }
+            // Update horizontal grid line (y = 0)
+            svgDataPoints.select(".grid-line.horizontal")
+                .attr("y1", newY(0))
+                .attr("y2", newY(0));
 
-                shape.setAttribute('class', `data-point ${isHit ? 'hit' : 'miss'} label-${predictedLabel} ${isTrainingSet ? 'train' : 'val'}`);
-
-                // Add data attributes for showInfo
-                shape.dataset.x0 = x[0].toFixed(2);
-                shape.dataset.x1 = x[1].toFixed(2);
-                shape.dataset.actualLabel = label;
-                shape.dataset.predictedLabel = predictedLabel;
-                shape.dataset.isHit = isHit;
-                shape.dataset.set = isTrainingSet ? 'Training' : 'Validation';
-
-                // Add event listeners
-                shape.addEventListener('mouseover', showDataPointInfo);
-                shape.addEventListener('mouseout', clearInfo);
-
-                svg.appendChild(shape);
-            }
+                // console.log(scatter.selectAll(".data-point").data());
+            // Update data points
+            scatter.selectAll(".data-point")
+                .attr("transform", d => {
+                    // console.log('Data point:', d);
+                    const cx = newX(d.x0);
+                    const cy = newY(d.x1);
+                    // console.log('Transformed:', cx, cy);
+                    return `translate(${cx},${cy})`;
+                });
         }
 
+        function plotDataPoints(dataPoints, predictions, isTrainingSet, r = 5) {
+            const className = isTrainingSet ? 'train' : 'val';
+           
+            const pointGroup = scatter.selectAll(`.data-point.${className}`)
+                .data(dataPoints)
+                .enter()
+                .append("g")
+                .attr("class", d => `data-point ${predictions[dataPoints.indexOf(d)] === d[1] ? 'hit' : 'miss'} label-${d[1]} ${isTrainingSet ? 'train' : 'val'}`)
+                .attr("transform", d => `translate(${x(d[0][0])},${y(d[0][1])})`)
+                .on("mouseover", (event, d) => {
+                    showDataPointInfo(event, d);
+                })
+                .on("mouseout", clearInfo);
+
+            pointGroup.each(function (d) {
+                const shape = d3.select(this);
+                const label = d[1];
+
+                shape.append("circle").attr("r", r);
+                // switch (label) {
+                //     case 0:
+                //         shape.append("circle")
+                //             .attr("r", r);
+                //         break;
+                //     case 1:
+                //         shape.append("rect")
+                //             .attr("x", -r)
+                //             .attr("y", -r)
+                //             .attr("width", r * 2)
+                //             .attr("height", r * 2);
+                //         break;
+                //     case 2:
+                //         const adjSz = r + 1;
+                //         shape.append("polygon")
+                //             .attr("points", `0,${-adjSz} ${-adjSz},${adjSz} ${adjSz},${adjSz}`);
+                //         break;
+                // }
+
+                shape.datum({
+                    x0: d[0][0].toFixed(2),
+                    x1: d[0][1].toFixed(2),
+                    actualLabel: label,
+                    predictedLabel: predictions[dataPoints.indexOf(d)],
+                    isHit: predictions[dataPoints.indexOf(d)] === label,
+                    set: isTrainingSet ? 'Training' : 'Validation'
+                });
+            });
+        }
 
         function updateDataPlot() {
-            const svg = document.getElementById('data-plot');
-            const width = parseInt(svg.getAttribute('width'));
-            const height = parseInt(svg.getAttribute('height'));
-            // Input range
-            const dataMinX = -2;
-            const dataMaxX = 2;
-            const dataMinY = -2;
-            const dataMaxY = 2;
-            const scaleX = width / 4;
-            const scaleY = height / 4;
-
             // Clear existing content
-            while (svg.firstChild) {
-                svg.removeChild(svg.firstChild);
-            }
+            scatter.selectAll("*").remove();
 
-            drawGrid(); // Draw the grid first
             // Plot training data
-            plotDataPoints(svg, train_split, predsTrain, true);
+            plotDataPoints(train_split, predsTrain, true);
 
             // Plot validation data
-            plotDataPoints(svg, val_split, predsVal, false);
-
+            plotDataPoints(val_split, predsVal, false);
         }
 
 
@@ -877,7 +1056,7 @@
                 content = "Initialize a new network with the given dimensions.\n\nThis will reset all weights and biases to new random values based on the specified layer structure and the Uniform Xavier Initialization.";
             } else if (target.classList.contains('node')) {
                 const layerIndex = parseInt(target.dataset.layer);
-                const nodeIndex = parseInt(target.dataset.node) ;
+                const nodeIndex = parseInt(target.dataset.node);
                 if (nodeIndex === layerDims[layerIndex] + 1) {
                     content = `Indentity node (the vector $$\\mathbf{1}$$).\n\nIt provides a way to add the bias term as part of the matrix multiplication, instead of seperately.`;
                 } else if (layerIndex === 0) {
@@ -979,19 +1158,26 @@
             renderInfoContent(infoElement, content);
         }
 
-        function showDataPointInfo(event) {
+        function showDataPointInfo(event, pointData) {
+            const xValue = pointData.x0
+            const yValue = pointData.x1
+            const predictedLabel =  pointData.predictedLabel
+            const actualLabel =  pointData.actualLabel
+            const isHit = pointData.isHit
+            const dataset = pointData.set
+
+            // TODO include above info if nexessary
             const target = event.target;
-            const isTraining = target.dataset.set === "Training";
+            const isTraining = dataset === "Training";
             const calculationFrequency = isTraining
                 ? "Updated every epoch"
                 : `Evaluated every ${valInterval} epochs`;
 
-            const content = `**${target.dataset.set}** Data Point (${calculationFrequency})\n
-        Coordinates: (${target.dataset.x0}, ${target.dataset.x1})
-        Actual Label: ${target.dataset.actualLabel}
-        Predicted Label: ${target.dataset.predictedLabel}\n
-        ${target.dataset.isHit === 'true' ? '**Correct** Prediction' : '**INCORRECT** Prediction'}
-    `;
+            const content = `**${dataset}** Data Point (${calculationFrequency})\n
+                Coordinates: (${xValue}, ${yValue})
+                Actual Label: ${actualLabel}
+                Predicted Label: ${predictedLabel}\n
+                ${isHit === true ? '**Correct** Prediction' : '**INCORRECT** Prediction'}`;
             renderInfoContent(infoElement, content);
         }
 
@@ -1034,7 +1220,7 @@
                 return parseFloat(connection.dataset.grad) !== 0;
             });
 
-            nonZeroGradConnections.forEach( connection => {
+            nonZeroGradConnections.forEach(connection => {
                 connection.classList.add('highlighted');
                 // connection.setAttribute('stroke-width', '3');
                 // connection.setAttribute('color', 'red')
@@ -1050,16 +1236,16 @@
                     color = `rgba(255, 0, 0, ${absGradient / (maxGradient + gradEpsilon)})`;
                 }
                 connection.style.filter = `drop-shadow(0 0 3px ${color})`;
-                    // // conn.style.filter = `drop-shadow(0 0 3px ${color})`;
-                    // if (strength >= 0) {
-                    //     conn.classList.add('positive');
-                    //     conn.classList.remove('negative');
-                    // } else {
-                    //     conn.classList.add('negative');
-                    //     conn.classList.remove('positive');
-                    // }
+                // // conn.style.filter = `drop-shadow(0 0 3px ${color})`;
+                // if (strength >= 0) {
+                //     conn.classList.add('positive');
+                //     conn.classList.remove('negative');
+                // } else {
+                //     conn.classList.add('negative');
+                //     conn.classList.remove('positive');
+                // }
             });
-            
+
         }
 
         function clearInfo(event) {
@@ -1309,7 +1495,7 @@
                         animatedConn.setAttribute('stroke-width', '3');
 
                         // Add dashed line for connection between y_hat and y
-                        if (layerIndex === layerDims.length - 1) { 
+                        if (layerIndex === layerDims.length - 1) {
                             animatedConn.setAttribute('stroke-dasharray', '5,5');
                         }
 
@@ -1393,7 +1579,7 @@
                         animatedConn.setAttribute('stroke-width', '3');
 
                         // Add dashed line for connection between y and y_hat
-                        if (layerIndex === layerDims.length ) {
+                        if (layerIndex === layerDims.length) {
                             animatedConn.setAttribute('stroke-dasharray', '5,5');
                         }
 
@@ -1414,7 +1600,7 @@
 
             animateLayer(layerDims.length);
         }
-        
+
 
         function animateShockWeights() {
             setMaxes();
@@ -1423,10 +1609,10 @@
             connections.forEach(connection => {
                 if (connection.dataset.strength) {
                     const newStrength = parseFloat(connection.dataset.strength);
-    
+
                     // Calculate new opacity
                     const opacity = Math.abs(newStrength) / maxStrength;
-    
+
                     // Animate jitter effect and opacity change
                     connection.animate([
                         { transform: 'translateY(0px)' },
@@ -1438,7 +1624,7 @@
                         iterations: 1,
                         fill: 'forwards'
                     });
-    
+
                     // Update the stroke-opacity attribute after animation
                     setTimeout(() => {
                         connection.setAttribute('stroke-opacity', opacity);
@@ -1448,11 +1634,11 @@
             });
             updatedStrengthViz();
             updateConnectionOpacity();
-         }
+        }
 
 
         function resetTrainingDisplay() {
-            document.getElementById('epoch-display').textContent = `Epoch: 0`;
+            document.getElementById('epoch-display').textContent = `Epoch: N/A`;
             document.getElementById('train-loss-value').textContent = 'N/A';
             document.getElementById('val-loss-value').textContent = 'N/A';
         }
@@ -1502,25 +1688,53 @@
                 // random Number in [a, b)
                 return a + (b - a) * this.random();
             }
+
+            normal(mean = 0, stddev = 1) {
+                let u, v, s;
+                do {
+                    u = this.random() * 2 - 1;
+                    v = this.random() * 2 - 1;
+                    s = u * u + v * v;
+                } while (s >= 1 || s == 0);
+
+                s = Math.sqrt(-2.0 * Math.log(s) / s);
+                return mean + stddev * u * s;
+            }
         }
 
-        function gen_data(random, n = 100) {
+        function gen_data(random, n = 200) {
             let pts = [];
+
             for (let i = 0; i < n; i++) {
-                let x = random.uniform(-2.0, 2.0);
-                let y = random.uniform(-2.0, 2.0);
-                // concentric circles
-                // label = 0 if x**2 + y**2 < 1 else 1 if x**2 + y**2 < 2 else 2
-                // very simple dataset
-                let label = x < 0 ? 0 : y < 0 ? 1 : 2;
-                pts.push([[x, y], label]);
+                let classType = Math.floor(random.random() * 3);
+                let x, y;
+
+                // smiley
+                switch (classType) {
+                    case 0:
+                        x = random.normal(-1, 0.25);
+                        y = random.normal(1, 0.7) * -Math.sin(x);
+                        break;
+                    case 1:
+                        x = random.normal(1, 0.25);
+                        y = random.normal(1, 0.7) * Math.sin(x);
+                        break;
+                    case 2:
+                        x = random.normal(0, 0.5);
+                        y = random.normal(-1, 0.5) * 0.5 * Math.cos(x) - 0.3;
+                        break;
+                }
+
+                pts.push([[x, y], classType]);
             }
+
             // create train/val/test splits of the data (80%, 10%, 10%)
             let tr = pts.slice(0, Math.floor(0.8 * n));
             let val = pts.slice(Math.floor(0.8 * n), Math.floor(0.9 * n));
             let te = pts.slice(Math.floor(0.9 * n));
             return [tr, val, te];
         }
+
 
         //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
         // Micrograd MLP (visual update)
@@ -2031,6 +2245,7 @@
 
         window.onload = function () {
             document.getElementById('layerDimInput').value = initialHidden;
+            initializeD3Plot();
             resetData();
             resetMLP();
             addReportingContainerListeners();
